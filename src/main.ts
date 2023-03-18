@@ -10,8 +10,15 @@ import {
   DoubleSide, 
   BufferGeometry, 
   Vector2, 
-  Points, 
+  Points,
+  DataTexture,
+  RGBAFormat,
+  FloatType,
+  BufferAttribute,
+  RawShaderMaterial,
+  NearestFilter,
 } from 'three'
+import { randFloat } from 'three/src/math/MathUtils'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Debug } from "./Debug"
 import { StartingShaderMateiral } from './/materials/StartingShaderMateiral'
@@ -45,6 +52,9 @@ export class Sketch {
   private _renderTarget?: WebGLRenderTarget
   private _quad?: Mesh<BufferGeometry, PostMaterial>
   private _pointsMat: PointsShaderMateiral
+  private _quad_pingpong?: Mesh<BufferGeometry, RawShaderMaterial>
+  private _particles_pingpong?: Points<BufferGeometry, RawShaderMaterial>
+  private _renderTargets: Array<WebGLRenderTarget>
 
   constructor(options: { dom: HTMLElement }) {
     this.scene = new Scene()
@@ -75,6 +85,7 @@ export class Sketch {
 
     this.addObjects()
     this.initpost()
+    this.fbo_pingpong()
     this.resize()
     this.render()
     this.setupResize()
@@ -84,6 +95,107 @@ export class Sketch {
     this._renderTarget = new WebGLRenderTarget(this.width, this.height)
     this._quad = new Mesh(new PlaneGeometry(2, 2), new PostMaterial())
     this._quad?.material.uniforms.u_size.value.copy(new Vector2(this.width, this.height))
+  }
+
+  fbo_pingpong() {
+    const vertexCount = 1000
+    const indices = new Float32Array(vertexCount * 2)
+    const textureSize = Math.round(Math.sqrt(vertexCount) + 0.5)
+
+    for (let i = 0, j = 0; i < vertexCount; ++i, j = i * 2) {
+      indices[j] = (2 * (1 / textureSize) * ((i % textureSize) + 0.5) - 1 + 1) / 2
+      indices[j + 1] = (2 * (1 / textureSize) * (Math.floor(i * (1 / textureSize)) + 0.5) - 1 + 1) / 2
+    }
+
+    const positions = new Float32Array(textureSize * textureSize * 4)
+    for (let i = 0, j = 0; i < vertexCount; ++i, j = i * 4) {
+      positions[j] = randFloat(-2, 2)
+      positions[j + 1] = randFloat(-2, 2)
+      positions[j + 2] = randFloat(-2, 2)
+    }
+
+    const positionsTexture = new DataTexture(positions, textureSize, textureSize, RGBAFormat, FloatType)
+    positionsTexture.needsUpdate = true
+    const particlesGeometry = new BufferGeometry()
+    particlesGeometry.setAttribute('index', new BufferAttribute(indices, 2))
+    // our geomnetry does not have a position attribute since we will use our texture to retrieve them. Threejs uses it to determine the draw range, we thus have to manually set it
+    particlesGeometry.setDrawRange(0, vertexCount)
+
+    // we do a simple lookup into the texture to get the position
+    this._particles_pingpong = new Points(particlesGeometry, new RawShaderMaterial({
+      vertexShader: `
+      uniform mat4 projectionMatrix;
+      uniform mat4 modelViewMatrix;
+      uniform sampler2D u_positionsTexture;
+    
+      attribute vec2 index;
+    
+      void main() {
+        vec3 position = texture2D(u_positionsTexture, index).xyz;
+    
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    
+        gl_PointSize = 5.0;
+      }
+      `,
+      fragmentShader: `
+      precision highp float;
+    
+      void main() {
+        gl_FragColor = vec4(1.0);
+      }
+      `,
+      uniforms: {
+        u_positionsTexture: { value: null }
+      }
+    }))
+
+    // fullscreen quad, where we use the previous position
+    this._quad_pingpong = new Mesh(new PlaneGeometry(2, 2), new RawShaderMaterial({
+      vertexShader: `
+      attribute vec3 position;
+      attribute vec2 uv;
+
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+
+        gl_Position = vec4(position, 1.0);
+      }
+      `,
+      fragmentShader: `
+      precision highp float;
+
+      uniform sampler2D u_previousPositionsTexture;
+
+      varying vec2 vUv;
+
+      void main() {
+        vec3 previousPosition = texture2D(u_previousPositionsTexture, vUv).xyz;
+
+        previousPosition.x += 0.01;
+        
+        if (previousPosition.x > 2.0) previousPosition.x = -2.0;
+
+        gl_FragColor = vec4(previousPosition, 1.0);
+      }
+      `,
+      uniforms: {
+        u_previousPositionsTexture: { value: null }
+      }
+    }))
+
+    this._renderTargets = Array.from(Array(2)).map(() => new WebGLRenderTarget(textureSize, textureSize, {
+      minFilter: NearestFilter,
+      magFilter: NearestFilter,
+      format: RGBAFormat,
+      type: FloatType,
+      depthBuffer: false,
+      stencilBuffer: false
+    }))
+
+    this._renderTargets[0].texture = positionsTexture
   }
 
   setupResize() {
@@ -106,11 +218,6 @@ export class Sketch {
   async addObjects() {
     let that = this
 
-    // this.mat_plane = new StartingShaderMateiral()
-    // this.geo_plane = new PlaneGeometry(1, 1, 10, 10)
-    // this.msh_plane = new Mesh(this.geo_plane, this.mat_plane)
-    // this.scene.add(this.msh_plane)
-
     // GLB loading
     const gltf = await gltfLoader.loadAsync(MSH_Monkey_url)
     const geometry = (gltf.scene.children[0] as Mesh).geometry
@@ -125,7 +232,7 @@ export class Sketch {
     this._pointsMat = new PointsShaderMateiral()
     this._point_msh = new Points(this._PointsGeo, this._pointsMat)
     this._point_msh.material.uniforms.u_viewport.value.copy(new Vector2(this.width, this.height))
-    this.scene.add(this._point_msh)
+    // this.scene.add(this._point_msh)
   }
 
   stop() {
@@ -153,15 +260,32 @@ export class Sketch {
       this._DummyInstancedMesh.material.uniforms.progress.value = this._debug.settings.progress
     }
     requestAnimationFrame(this.render)
-    // this.renderer.render(this.scene, this.camera)
-
-    this.renderer.setRenderTarget(this._renderTarget!)
-    this.renderer.clear(false, true, false)
     this.renderer.render(this.scene, this.camera)
 
-    this._quad!.material.uniforms.u_texture.value = this._renderTarget!.texture
+    // this.renderer.setRenderTarget(this._renderTarget!)
+    // this.renderer.clear(false, true, false)
+    // this.renderer.render(this.scene, this.camera)
+
+    // this._quad!.material.uniforms.u_texture.value = this._renderTarget!.texture
+    // this.renderer.setRenderTarget(null)
+    // this.renderer.render(this._quad!, this.camera)
+
+    // if(this._quad_pingpong && this._particles_pingpong){
+    //   console.log('test')
+    // }
+    // simulation first, then render
+    this._quad_pingpong!.material.uniforms.u_previousPositionsTexture.value = this._renderTargets[0]!.texture
+    this.renderer.setRenderTarget(this._renderTargets[1])
+    this.renderer.render(this._quad_pingpong!, this.camera)
+
+    this._particles_pingpong!.material.uniforms.u_positionsTexture.value = this._renderTargets[1]!.texture
     this.renderer.setRenderTarget(null)
-    this.renderer.render(this._quad!, this.camera)
+    this.renderer.render(this._particles_pingpong!, this.camera)
+
+    // swap our fbos, there are dozen of ways to do this, this is just one of them
+    const temp = this._renderTargets[1]
+    this._renderTargets[1] = this._renderTargets[0]
+    this._renderTargets[0] = temp
   }
 }
 
