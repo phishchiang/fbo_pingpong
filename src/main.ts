@@ -32,6 +32,7 @@ import MSH_Monkey_url from './model/MSH_Monkey.glb?url'
 
 export class Sketch {
   private renderer: WebGLRenderer
+  private renderer_rt_layer: WebGLRenderer
   private scene: Scene
   private container: HTMLElement
   private width: number
@@ -70,7 +71,14 @@ export class Sketch {
     this.imageAspect = 1
     this._debug = new Debug()
 
+    this.renderer_rt_layer = new WebGLRenderer( { antialias: true })
+    this.renderer_rt_layer.setPixelRatio(window.devicePixelRatio)
+    this.renderer_rt_layer.setSize(this.width * 0.2, this.height * 0.2)
+    this.renderer_rt_layer.setClearColor(0x000000, 1)
+
     this.container.appendChild(this.renderer.domElement)
+    this.container.appendChild(this.renderer_rt_layer.domElement) // renderer_rt_layer
+    
     this.camera = new PerspectiveCamera(
       70,
       window.innerWidth / window.innerHeight,
@@ -279,6 +287,8 @@ export class Sketch {
     requestAnimationFrame(this.render)
   
     this._quad_simulation!.material.uniforms.u_previousPositionsTexture.value = this._renderTargets[0].texture
+    this.renderer.setRenderTarget(null)
+    this.renderer.render(this._quad_simulation!, this.camera)
     this.renderer.setRenderTarget(this._renderTargets[1])
     this.renderer.render(this._quad_simulation!, this.camera)
 
@@ -286,17 +296,20 @@ export class Sketch {
     this.renderer.setRenderTarget(null)
     this.renderer.render(this._particles_render!, this.camera)
 
+    // renderer_rt_layer
+    this._quad_simulation!.material.uniforms.u_previousPositionsTexture.value = this._renderTargets[0].texture
+    this.renderer_rt_layer.setRenderTarget(this._renderTargets[1])
+    this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+    this.renderer_rt_layer.setRenderTarget(null)
+    this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+
     // swap our fbos, there are dozen of ways to do this, this is just one of them
     const temp = this._renderTargets[1]
     this._renderTargets[1] = this._renderTargets[0]
     this._renderTargets[0] = temp
 
-    /*
-    // Just render the first initialized render texture 
-    this._quad_simulation!.material.uniforms.u_previousPositionsTexture.value = this._renderTargets[0].texture
-    this.renderer.setRenderTarget(null)
-    this.renderer.render(this._quad_simulation!, this.camera)
-    */
+    
+  
   }
 }
 
