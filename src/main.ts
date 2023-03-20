@@ -1,7 +1,8 @@
 import './style.css'
 import { 
   WebGLRenderer,
-  WebGLRenderTarget, 
+  WebGLRenderTarget,
+  WebGLMultipleRenderTargets,
   Scene, 
   PerspectiveCamera, 
   ShaderMaterial, 
@@ -55,7 +56,7 @@ export class Sketch {
   private _pointsMat: PointsShaderMateiral
   private _quad_simulation?: Mesh<BufferGeometry, RawShaderMaterial>
   private _particles_render?: Points<BufferGeometry, RawShaderMaterial>
-  private _renderTargets: Array<WebGLRenderTarget>
+  private _renderTargets: Array<WebGLMultipleRenderTargets>
 
   constructor(options: { dom: HTMLElement }) {
     this.scene = new Scene()
@@ -120,7 +121,7 @@ export class Sketch {
         positions_array.push(...[randFloat(-r, r), randFloat(-r, r), randFloat(-r, r), 0])
 
         // random data
-        extras_array.push(...[Math.random(), Math.random(), Math.random(), 0])
+        extras_array.push(...[Math.random(), Math.random(), Math.random()])
 
         // mesh point
         uvs_array.push(...[(i / numParticles) * 2 - 1, (j / numParticles) * 2 - 1])
@@ -140,8 +141,11 @@ export class Sketch {
     positionsTexture.needsUpdate = true
     const particlesGeometry = new BufferGeometry()
     particlesGeometry.setAttribute('index', new BufferAttribute(uvs_float_array, 2))
+    particlesGeometry.setAttribute('a_extra', new BufferAttribute(extras_float_array, 3))
     // our geomnetry does not have a position attribute since we will use our texture to retrieve them. Threejs uses it to determine the draw range, we thus have to manually set it
     particlesGeometry.setDrawRange(0, numParticles * numParticles)
+
+    console.log(particlesGeometry)
 
 
     // we do a simple lookup into the texture to get the position
@@ -194,7 +198,9 @@ export class Sketch {
       uniform sampler2D u_previousPositionsTexture;
 
       in vec2 vUv;
-      out vec4 out_Color;
+      // out vec4 out_Color;
+      layout (location = 0) out vec4 oFragColor0;
+      layout (location = 1) out vec4 oFragColor1;
 
       void main() {
         vec3 previousPosition = texture(u_previousPositionsTexture, vUv).xyz;
@@ -203,7 +209,8 @@ export class Sketch {
         
         if (previousPosition.x > 2.0) previousPosition.x = -2.0;
 
-        out_Color = vec4(previousPosition, 1.0);
+        oFragColor0 = vec4(previousPosition, 1.0);
+        oFragColor1 = vec4(1.0);
       }
       `,
       uniforms: {
@@ -211,7 +218,7 @@ export class Sketch {
       }
     }))
 
-    this._renderTargets = Array.from(Array(2)).map(() => new WebGLRenderTarget(numParticles, numParticles, {
+    this._renderTargets = Array.from(Array(2)).map(() => new WebGLMultipleRenderTargets(numParticles, numParticles, 2, {
       minFilter: NearestFilter,
       magFilter: NearestFilter,
       format: RGBAFormat,
@@ -220,7 +227,7 @@ export class Sketch {
       stencilBuffer: false
     }))
 
-    this._renderTargets[0].texture = positionsTexture
+    this._renderTargets[0].texture[0] = positionsTexture
   }
 
   setupResize() {
@@ -286,18 +293,18 @@ export class Sketch {
     }
     requestAnimationFrame(this.render)
   
-    this._quad_simulation!.material.uniforms.u_previousPositionsTexture.value = this._renderTargets[0].texture
+    this._quad_simulation!.material.uniforms.u_previousPositionsTexture.value = this._renderTargets[0].texture[0]
     this.renderer.setRenderTarget(null)
     this.renderer.render(this._quad_simulation!, this.camera)
     this.renderer.setRenderTarget(this._renderTargets[1])
     this.renderer.render(this._quad_simulation!, this.camera)
 
-    this._particles_render!.material.uniforms.u_positionsTexture.value = this._renderTargets[1]!.texture
+    this._particles_render!.material.uniforms.u_positionsTexture.value = this._renderTargets[1]!.texture[0]
     this.renderer.setRenderTarget(null)
     this.renderer.render(this._particles_render!, this.camera)
 
     // renderer_rt_layer
-    this._quad_simulation!.material.uniforms.u_previousPositionsTexture.value = this._renderTargets[0].texture
+    this._quad_simulation!.material.uniforms.u_previousPositionsTexture.value = this._renderTargets[0].texture[0]
     this.renderer_rt_layer.setRenderTarget(this._renderTargets[1])
     this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
     this.renderer_rt_layer.setRenderTarget(null)
