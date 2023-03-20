@@ -24,9 +24,12 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Debug } from "./Debug"
 import { StartingShaderMateiral } from './/materials/StartingShaderMateiral'
 import { PointsShaderMateiral } from './/materials/PointsShaderMateiral'
+import { GPGPURenderMaterial } from './materials/GPGPURenderMaterial'
+import { GPGPUSimulationMaterial } from './materials/GPGPUSimulationMaterial'
 import { PostMaterial } from './/materials/PostMaterial'
 import { DummyInstancedMesh } from './/objects/DummyInstancedMesh'
 import { BasicGeo } from './/objects/BasicGeo'
+import { GPGPUGeometry } from './/objects/GPGPUGeometry'
 import { PointsGeo } from './/objects/PointsGeo'
 import { gltfLoader } from "./glb_loader"
 import MSH_Monkey_url from './model/MSH_Monkey.glb?url'
@@ -108,130 +111,22 @@ export class Sketch {
 
   fbo_pingpong() {
 
-    const numParticles = 64
-    const positions_array = []
-    const extras_array = []
-    const uvs_array = []
-    const indices_array = []
-    let count = 0
-    const r = 2
-    for (let j = 0; j < numParticles; j++) {
-      for (let i = 0; i < numParticles; i++) {
-        // particle position
-        positions_array.push(...[randFloat(-r, r), randFloat(-r, r), randFloat(-r, r), 0])
-
-        // random data
-        extras_array.push(...[Math.random(), Math.random(), Math.random(), 0])
-
-        // mesh point
-        uvs_array.push(...[(i / numParticles) * 2 - 1, (j / numParticles) * 2 - 1])
-
-        indices_array.push(count)
-        count++
-      }
-    }
-
-    const positions_float_array = new Float32Array(positions_array)
-    const extras_float_array = new Float32Array(extras_array)
-    const uvs_float_array = new Float32Array(uvs_array)
-    const indices_float_array = new Float32Array(indices_array)
-
+    let _GPGPUGeometry = new GPGPUGeometry()
     
-    const positions_data_texture = new DataTexture(positions_float_array, numParticles, numParticles, RGBAFormat, FloatType)
+    const positions_data_texture = new DataTexture(_GPGPUGeometry._positions_float_array, _GPGPUGeometry._numParticles, _GPGPUGeometry._numParticles, RGBAFormat, FloatType)
     positions_data_texture.needsUpdate = true
-    const extra_data_texture = new DataTexture(extras_float_array, numParticles, numParticles, RGBAFormat, FloatType)
+    const extra_data_texture = new DataTexture(_GPGPUGeometry._extras_float_array, _GPGPUGeometry._numParticles, _GPGPUGeometry._numParticles, RGBAFormat, FloatType)
     extra_data_texture.needsUpdate = true
-    const particlesGeometry = new BufferGeometry()
-    particlesGeometry.setAttribute('a_renderTarget_uv', new BufferAttribute(uvs_float_array, 2))
-    // our geomnetry does not have a position attribute since we will use our texture to retrieve them. Threejs uses it to determine the draw range, we thus have to manually set it
-    particlesGeometry.setDrawRange(0, numParticles * numParticles)
-
-    console.log(particlesGeometry)
-
+    
+    console.log(_GPGPUGeometry._numParticles)
 
     // we do a simple lookup into the texture to get the position
-    this._particles_render = new Points(particlesGeometry, new RawShaderMaterial({
-      vertexShader: /* glsl */ `#version 300 es
-      uniform mat4 projectionMatrix;
-      uniform mat4 modelViewMatrix;
-      uniform sampler2D u_positions_data_texture;
-    
-      in vec2 a_renderTarget_uv;
-
-      out vec3 v_color;
-    
-      void main() {
-        
-        vec3 position = texture(u_positions_data_texture, a_renderTarget_uv).xyz;
-
-        v_color = position;
-        
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    
-        gl_PointSize = 5.0;
-      }
-      `,
-      fragmentShader: /* glsl */ `#version 300 es
-      precision highp float;
-      out vec4 out_Color;
-      in vec3 v_color;
-    
-      void main() {
-        out_Color = vec4(vec3(v_color), 1.0);
-      }
-      `,
-      uniforms: {
-        u_positions_data_texture: { value: null },
-        u_extra_data_texture: { value: null },
-      }
-    }))
+    this._particles_render = new Points(_GPGPUGeometry, new GPGPURenderMaterial())
 
     // fullscreen quad, where we use the previous position
-    this._quad_simulation = new Mesh(new PlaneGeometry(2, 2), new RawShaderMaterial({
-      vertexShader: /* glsl */ `#version 300 es
-      in vec3 position;
-      in vec2 uv;
+    this._quad_simulation = new Mesh(new PlaneGeometry(2, 2), new GPGPUSimulationMaterial())
 
-      out vec2 vUv;
-
-      void main() {
-        vUv = uv;
-
-        gl_Position = vec4(position, 1.0);
-      }
-      `,
-      fragmentShader: /* glsl */ `#version 300 es
-      precision highp float;
-
-      uniform sampler2D u_previousPositionsTexture;
-      uniform sampler2D u_extra_data_texture;
-
-      in vec2 vUv;
-      // out vec4 out_Color;
-      layout (location = 0) out vec4 oFragColor0;
-      layout (location = 1) out vec4 oFragColor1;
-
-      void main() {
-        vec3 previousPosition = texture(u_previousPositionsTexture, vUv).xyz;
-        vec3 previous_extra = texture(u_extra_data_texture, vUv).xyz;
-
-        float speed = mix(1.0, 100.0, previous_extra.x);
-
-        previousPosition.x += (speed * 0.0001);
-        
-        if (previousPosition.x > 2.0) previousPosition.x = -2.0;
-
-        oFragColor0 = vec4(previousPosition, 1.0);
-        oFragColor1 = vec4(previous_extra, 1.0);
-      }
-      `,
-      uniforms: {
-        u_previousPositionsTexture: { value: null },
-        u_extra_data_texture: { value: null },
-      }
-    }))
-
-    this._renderTargets = Array.from(Array(2)).map(() => new WebGLMultipleRenderTargets(numParticles, numParticles, 2, {
+    this._renderTargets = Array.from(Array(2)).map(() => new WebGLMultipleRenderTargets(_GPGPUGeometry._numParticles, _GPGPUGeometry._numParticles, 2, {
       minFilter: NearestFilter,
       magFilter: NearestFilter,
       format: RGBAFormat,
@@ -307,7 +202,7 @@ export class Sketch {
     }
     requestAnimationFrame(this.render)
   
-    this._quad_simulation!.material.uniforms.u_previousPositionsTexture.value = this._renderTargets[0].texture[0]
+    this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
     this._quad_simulation!.material.uniforms.u_extra_data_texture.value = this._renderTargets[0].texture[1]
     this.renderer.setRenderTarget(this._renderTargets[1])
     this.renderer.render(this._quad_simulation!, this.camera)
@@ -318,7 +213,7 @@ export class Sketch {
     this.renderer.render(this._particles_render!, this.camera)
 
     // renderer_rt_layer
-    this._quad_simulation!.material.uniforms.u_previousPositionsTexture.value = this._renderTargets[0].texture[0]
+    this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
     this.renderer_rt_layer.setRenderTarget(this._renderTargets[1])
     this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
     this.renderer_rt_layer.setRenderTarget(null)
