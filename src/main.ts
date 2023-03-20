@@ -121,7 +121,7 @@ export class Sketch {
         positions_array.push(...[randFloat(-r, r), randFloat(-r, r), randFloat(-r, r), 0])
 
         // random data
-        extras_array.push(...[Math.random(), Math.random(), Math.random()])
+        extras_array.push(...[Math.random(), Math.random(), Math.random(), 0])
 
         // mesh point
         uvs_array.push(...[(i / numParticles) * 2 - 1, (j / numParticles) * 2 - 1])
@@ -137,11 +137,12 @@ export class Sketch {
     const indices_float_array = new Float32Array(indices_array)
 
     
-    const positionsTexture = new DataTexture(positions_float_array, numParticles, numParticles, RGBAFormat, FloatType)
-    positionsTexture.needsUpdate = true
+    const positions_data_texture = new DataTexture(positions_float_array, numParticles, numParticles, RGBAFormat, FloatType)
+    positions_data_texture.needsUpdate = true
+    const extra_data_texture = new DataTexture(extras_float_array, numParticles, numParticles, RGBAFormat, FloatType)
+    extra_data_texture.needsUpdate = true
     const particlesGeometry = new BufferGeometry()
-    particlesGeometry.setAttribute('index', new BufferAttribute(uvs_float_array, 2))
-    particlesGeometry.setAttribute('a_extra', new BufferAttribute(extras_float_array, 3))
+    particlesGeometry.setAttribute('a_renderTarget_uv', new BufferAttribute(uvs_float_array, 2))
     // our geomnetry does not have a position attribute since we will use our texture to retrieve them. Threejs uses it to determine the draw range, we thus have to manually set it
     particlesGeometry.setDrawRange(0, numParticles * numParticles)
 
@@ -150,37 +151,44 @@ export class Sketch {
 
     // we do a simple lookup into the texture to get the position
     this._particles_render = new Points(particlesGeometry, new RawShaderMaterial({
-      vertexShader: `#version 300 es
+      vertexShader: /* glsl */ `#version 300 es
       uniform mat4 projectionMatrix;
       uniform mat4 modelViewMatrix;
-      uniform sampler2D u_positionsTexture;
+      uniform sampler2D u_positions_data_texture;
     
-      in vec2 index;
+      in vec2 a_renderTarget_uv;
+
+      out vec3 v_color;
     
       void main() {
-        vec3 position = texture(u_positionsTexture, index).xyz;
-    
+        
+        vec3 position = texture(u_positions_data_texture, a_renderTarget_uv).xyz;
+
+        v_color = position;
+        
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     
         gl_PointSize = 5.0;
       }
       `,
-      fragmentShader: `#version 300 es
+      fragmentShader: /* glsl */ `#version 300 es
       precision highp float;
       out vec4 out_Color;
+      in vec3 v_color;
     
       void main() {
-        out_Color = vec4(1.0);
+        out_Color = vec4(vec3(v_color), 1.0);
       }
       `,
       uniforms: {
-        u_positionsTexture: { value: null }
+        u_positions_data_texture: { value: null },
+        u_extra_data_texture: { value: null },
       }
     }))
 
     // fullscreen quad, where we use the previous position
     this._quad_simulation = new Mesh(new PlaneGeometry(2, 2), new RawShaderMaterial({
-      vertexShader: `#version 300 es
+      vertexShader: /* glsl */ `#version 300 es
       in vec3 position;
       in vec2 uv;
 
@@ -192,10 +200,11 @@ export class Sketch {
         gl_Position = vec4(position, 1.0);
       }
       `,
-      fragmentShader: `#version 300 es
+      fragmentShader: /* glsl */ `#version 300 es
       precision highp float;
 
       uniform sampler2D u_previousPositionsTexture;
+      uniform sampler2D u_extra_data_texture;
 
       in vec2 vUv;
       // out vec4 out_Color;
@@ -204,17 +213,21 @@ export class Sketch {
 
       void main() {
         vec3 previousPosition = texture(u_previousPositionsTexture, vUv).xyz;
+        vec3 previous_extra = texture(u_extra_data_texture, vUv).xyz;
 
-        previousPosition.x += 0.01;
+        float speed = mix(1.0, 100.0, previous_extra.x);
+
+        previousPosition.x += (speed * 0.0001);
         
         if (previousPosition.x > 2.0) previousPosition.x = -2.0;
 
         oFragColor0 = vec4(previousPosition, 1.0);
-        oFragColor1 = vec4(1.0);
+        oFragColor1 = vec4(previous_extra, 1.0);
       }
       `,
       uniforms: {
-        u_previousPositionsTexture: { value: null }
+        u_previousPositionsTexture: { value: null },
+        u_extra_data_texture: { value: null },
       }
     }))
 
@@ -227,7 +240,8 @@ export class Sketch {
       stencilBuffer: false
     }))
 
-    this._renderTargets[0].texture[0] = positionsTexture
+    this._renderTargets[0].texture[0] = positions_data_texture
+    this._renderTargets[0].texture[1] = extra_data_texture
   }
 
   setupResize() {
@@ -294,12 +308,12 @@ export class Sketch {
     requestAnimationFrame(this.render)
   
     this._quad_simulation!.material.uniforms.u_previousPositionsTexture.value = this._renderTargets[0].texture[0]
-    this.renderer.setRenderTarget(null)
-    this.renderer.render(this._quad_simulation!, this.camera)
+    this._quad_simulation!.material.uniforms.u_extra_data_texture.value = this._renderTargets[0].texture[1]
     this.renderer.setRenderTarget(this._renderTargets[1])
     this.renderer.render(this._quad_simulation!, this.camera)
 
-    this._particles_render!.material.uniforms.u_positionsTexture.value = this._renderTargets[1]!.texture[0]
+    this._particles_render!.material.uniforms.u_positions_data_texture.value = this._renderTargets[1]!.texture[0]
+    this._particles_render!.material.uniforms.u_extra_data_texture.value = this._renderTargets[1]!.texture[1]
     this.renderer.setRenderTarget(null)
     this.renderer.render(this._particles_render!, this.camera)
 
