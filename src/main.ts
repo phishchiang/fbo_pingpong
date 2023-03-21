@@ -54,6 +54,7 @@ export class Sketch {
   private _BasicGeo: BasicGeo
   private _PointsGeo: PointsGeo
   private _point_msh: Points<PointsGeo, PointsShaderMateiral>
+  private _GPGPUGeometry: GPGPUGeometry
   private _renderTarget?: WebGLRenderTarget
   private _quad?: Mesh<BufferGeometry, PostMaterial>
   private _pointsMat: PointsShaderMateiral
@@ -81,7 +82,7 @@ export class Sketch {
     this.renderer_rt_layer.setClearColor(0x000000, 1)
 
     this.container.appendChild(this.renderer.domElement)
-    this.container.appendChild(this.renderer_rt_layer.domElement) // renderer_rt_layer
+    // this.container.appendChild(this.renderer_rt_layer.domElement) // renderer_rt_layer
     
     this.camera = new PerspectiveCamera(
       70,
@@ -97,7 +98,7 @@ export class Sketch {
 
     this.addObjects()
     this.initpost()
-    this.fbo_pingpong()
+    this.initGPGPU()
     this.resize()
     this.render()
     this.setupResize()
@@ -109,24 +110,23 @@ export class Sketch {
     this._quad?.material.uniforms.u_size.value.copy(new Vector2(this.width, this.height))
   }
 
-  fbo_pingpong() {
+  initGPGPU() {
 
-    let _GPGPUGeometry = new GPGPUGeometry()
+    this._GPGPUGeometry = new GPGPUGeometry()
+    let { numParticles, positions_float_array, extras_float_array} = this._GPGPUGeometry
     
-    const positions_data_texture = new DataTexture(_GPGPUGeometry._positions_float_array, _GPGPUGeometry._numParticles, _GPGPUGeometry._numParticles, RGBAFormat, FloatType)
+    const positions_data_texture = new DataTexture(positions_float_array, numParticles, numParticles, RGBAFormat, FloatType)
     positions_data_texture.needsUpdate = true
-    const extra_data_texture = new DataTexture(_GPGPUGeometry._extras_float_array, _GPGPUGeometry._numParticles, _GPGPUGeometry._numParticles, RGBAFormat, FloatType)
+    const extra_data_texture = new DataTexture(extras_float_array, numParticles, numParticles, RGBAFormat, FloatType)
     extra_data_texture.needsUpdate = true
     
-    console.log(_GPGPUGeometry._numParticles)
+    console.log(this._GPGPUGeometry)
 
-    // we do a simple lookup into the texture to get the position
-    this._particles_render = new Points(_GPGPUGeometry, new GPGPURenderMaterial())
+    this._particles_render = new Points(this._GPGPUGeometry, new GPGPURenderMaterial())
 
-    // fullscreen quad, where we use the previous position
     this._quad_simulation = new Mesh(new PlaneGeometry(2, 2), new GPGPUSimulationMaterial())
 
-    this._renderTargets = Array.from(Array(2)).map(() => new WebGLMultipleRenderTargets(_GPGPUGeometry._numParticles, _GPGPUGeometry._numParticles, 2, {
+    this._renderTargets = Array.from(Array(2)).map(() => new WebGLMultipleRenderTargets(numParticles, numParticles, 2, {
       minFilter: NearestFilter,
       magFilter: NearestFilter,
       format: RGBAFormat,
@@ -212,12 +212,12 @@ export class Sketch {
     this.renderer.setRenderTarget(null)
     this.renderer.render(this._particles_render!, this.camera)
 
-    // renderer_rt_layer
-    this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
-    this.renderer_rt_layer.setRenderTarget(this._renderTargets[1])
-    this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
-    this.renderer_rt_layer.setRenderTarget(null)
-    this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+    // // renderer_rt_layer
+    // this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
+    // this.renderer_rt_layer.setRenderTarget(this._renderTargets[1])
+    // this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+    // this.renderer_rt_layer.setRenderTarget(null)
+    // this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
 
     // swap our fbos, there are dozen of ways to do this, this is just one of them
     const temp = this._renderTargets[1]
