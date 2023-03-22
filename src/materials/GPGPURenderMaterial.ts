@@ -35,6 +35,7 @@ export class GPGPURenderMaterial extends RawShaderMaterial {
   declare uniforms: {
     time: IUniform<number>
     u_positions_data_texture: IUniform<Texture | null>
+    u_velocity_data_texture: IUniform<Texture | null>
     u_extra_data_texture: IUniform<Texture | null>
   }
 
@@ -42,6 +43,7 @@ export class GPGPURenderMaterial extends RawShaderMaterial {
     const uniforms: GPGPURenderMaterial['uniforms'] = {
       time: { value: 0 },
       u_positions_data_texture: { value: null },
+      u_velocity_data_texture: { value: null },
       u_extra_data_texture: { value: null },
     }
 

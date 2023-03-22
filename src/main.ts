@@ -83,7 +83,7 @@ export class Sketch {
     this.renderer_rt_layer.setClearColor(0x000000, 1)
 
     this.container.appendChild(this.renderer.domElement)
-    // this.container.appendChild(this.renderer_rt_layer.domElement) // renderer_rt_layer
+    this.container.appendChild(this.renderer_rt_layer.domElement) // renderer_rt_layer
     
     this.camera = new PerspectiveCamera(
       70,
@@ -128,7 +128,7 @@ export class Sketch {
 
     this._quad_simulation = new Mesh(new PlaneGeometry(2, 2), new GPGPUSimulationMaterial())
 
-    this._renderTargets = Array.from(Array(2)).map(() => new WebGLMultipleRenderTargets(numParticles, numParticles, 2, {
+    this._renderTargets = Array.from(Array(2)).map(() => new WebGLMultipleRenderTargets(numParticles, numParticles, 3, {
       minFilter: NearestFilter,
       magFilter: NearestFilter,
       format: RGBAFormat,
@@ -209,24 +209,27 @@ export class Sketch {
     }
     requestAnimationFrame(this.render)
 
+    this._quad_simulation!.material.uniforms.u_time.value = this.time
     this._quad_simulation!.material.uniforms.u_is_after_first_render.value = !this._isFirstRender
   
     this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
-    this._quad_simulation!.material.uniforms.u_extra_data_texture.value = this._renderTargets[0].texture[1]
+    this._quad_simulation!.material.uniforms.u_velocity_data_texture.value = this._renderTargets[0].texture[1]
+    this._quad_simulation!.material.uniforms.u_extra_data_texture.value = this._renderTargets[0].texture[2]
     this.renderer.setRenderTarget(this._renderTargets[1])
     this.renderer.render(this._quad_simulation!, this.camera)
 
     this._particles_render!.material.uniforms.u_positions_data_texture.value = this._renderTargets[1]!.texture[0]
-    this._particles_render!.material.uniforms.u_extra_data_texture.value = this._renderTargets[1]!.texture[1]
+    this._particles_render!.material.uniforms.u_velocity_data_texture.value = this._renderTargets[1]!.texture[1]
+    this._particles_render!.material.uniforms.u_extra_data_texture.value = this._renderTargets[1]!.texture[2]
     this.renderer.setRenderTarget(null)
     this.renderer.render(this._particles_render!, this.camera)
 
-    // // renderer_rt_layer
-    // this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
-    // this.renderer_rt_layer.setRenderTarget(this._renderTargets[1])
-    // this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
-    // this.renderer_rt_layer.setRenderTarget(null)
-    // this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+    // renderer_rt_layer
+    this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[1]
+    this.renderer_rt_layer.setRenderTarget(this._renderTargets[1])
+    this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+    this.renderer_rt_layer.setRenderTarget(null)
+    this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
 
     // swap our fbos, there are dozen of ways to do this, this is just one of them
     const temp = this._renderTargets[1]
