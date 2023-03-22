@@ -22,7 +22,7 @@ void main() {
   float size_random = mix(0.1, 0.75, extra.x);
 
   // gl_PointSize = 5.0 * size_random;
-  gl_PointSize = 20. * ( 1. / - (modelViewMatrix * vec4(position, 1.0)).z) * size_random;
+  gl_PointSize = 50. * ( 1. / - (modelViewMatrix * vec4(position, 1.0)).z) * size_random;
 }
 `
 
@@ -32,6 +32,9 @@ out vec4 out_Color;
 in vec3 v_color;
 
 void main() {
+  float dist = length(gl_PointCoord - vec2(0.5));
+  if(dist > 0.5) discard;
+  
   out_Color = vec4(vec3(v_color), 1.0);
 }
 `

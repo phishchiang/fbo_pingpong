@@ -10,7 +10,7 @@ export class GPGPUGeometry extends BufferGeometry{
 
   constructor() {
     super()
-    this.numParticles = 1000
+    this.numParticles = 100
     const positions_array = []
     const extras_array = []
     const uvs_array = []

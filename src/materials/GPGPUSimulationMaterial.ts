@@ -176,7 +176,7 @@ void main() {
 
     
     // set boundary
-    float boundary_radius = 4.0;
+    float boundary_radius = 3.0;
     float dist_to_center = length(previous_positions - vec3(0.0));
     vec3 boundary_dir = -normalize(previous_positions - vec3(0.0));
     float boundary_force = smoothstep(boundary_radius * 0.5, boundary_radius, dist_to_center);
