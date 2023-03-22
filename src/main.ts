@@ -83,7 +83,7 @@ export class Sketch {
     this.renderer_rt_layer.setClearColor(0x000000, 1)
 
     this.container.appendChild(this.renderer.domElement)
-    this.container.appendChild(this.renderer_rt_layer.domElement) // renderer_rt_layer
+    // this.container.appendChild(this.renderer_rt_layer.domElement) // renderer_rt_layer
     
     this.camera = new PerspectiveCamera(
       70,
@@ -224,12 +224,12 @@ export class Sketch {
     this.renderer.setRenderTarget(null)
     this.renderer.render(this._particles_render!, this.camera)
 
-    // renderer_rt_layer
-    this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[1]
-    this.renderer_rt_layer.setRenderTarget(this._renderTargets[1])
-    this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
-    this.renderer_rt_layer.setRenderTarget(null)
-    this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+    // // renderer_rt_layer
+    // this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[1]
+    // this.renderer_rt_layer.setRenderTarget(this._renderTargets[1])
+    // this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+    // this.renderer_rt_layer.setRenderTarget(null)
+    // this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
 
     // swap our fbos, there are dozen of ways to do this, this is just one of them
     const temp = this._renderTargets[1]

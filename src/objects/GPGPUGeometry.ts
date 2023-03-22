@@ -10,13 +10,13 @@ export class GPGPUGeometry extends BufferGeometry{
 
   constructor() {
     super()
-    this.numParticles = 64
+    this.numParticles = 1000
     const positions_array = []
     const extras_array = []
     const uvs_array = []
     const indices_array = []
     let count = 0
-    const r = 2
+    const r = 1
     for (let j = 0; j < this.numParticles; j++) {
       for (let i = 0; i < this.numParticles; i++) {
         // particle position
