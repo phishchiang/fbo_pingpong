@@ -61,6 +61,7 @@ export class Sketch {
   private _quad_simulation?: Mesh<BufferGeometry, RawShaderMaterial>
   private _particles_render?: Points<BufferGeometry, RawShaderMaterial>
   private _renderTargets: Array<WebGLMultipleRenderTargets>
+  private _isFirstRender = true
 
   constructor(options: { dom: HTMLElement }) {
     this.scene = new Scene()
@@ -120,9 +121,10 @@ export class Sketch {
     const extra_data_texture = new DataTexture(extras_float_array, numParticles, numParticles, RGBAFormat, FloatType)
     extra_data_texture.needsUpdate = true
     
-    console.log(this._GPGPUGeometry)
+
 
     this._particles_render = new Points(this._GPGPUGeometry, new GPGPURenderMaterial())
+    this._particles_render.frustumCulled = false // Avoid disappearing when moving cam
 
     this._quad_simulation = new Mesh(new PlaneGeometry(2, 2), new GPGPUSimulationMaterial())
 
@@ -135,8 +137,13 @@ export class Sketch {
       stencilBuffer: false
     }))
 
-    this._renderTargets[0].texture[0] = positions_data_texture
-    this._renderTargets[0].texture[1] = extra_data_texture
+    // you will get the chrome warning for Texture is immutable
+    // this._renderTargets[0].texture[0] = positions_data_texture
+    // this._renderTargets[0].texture[1] = extra_data_texture
+    
+    this._quad_simulation!.material.uniforms.u_init_positions_data_texture.value = positions_data_texture
+    this._quad_simulation!.material.uniforms.u_init_extra_data_texture.value = extra_data_texture
+    console.log(this._quad_simulation)
   }
 
   setupResize() {
@@ -201,6 +208,8 @@ export class Sketch {
       this._DummyInstancedMesh.material.uniforms.progress.value = this._debug.settings.progress
     }
     requestAnimationFrame(this.render)
+
+    this._quad_simulation!.material.uniforms.u_is_after_first_render.value = !this._isFirstRender
   
     this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
     this._quad_simulation!.material.uniforms.u_extra_data_texture.value = this._renderTargets[0].texture[1]
@@ -224,8 +233,7 @@ export class Sketch {
     this._renderTargets[1] = this._renderTargets[0]
     this._renderTargets[0] = temp
 
-    
-  
+    this._isFirstRender = false
   }
 }
 

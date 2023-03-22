@@ -18,6 +18,9 @@ precision highp float;
 
 uniform sampler2D u_positions_data_texture;
 uniform sampler2D u_extra_data_texture;
+uniform sampler2D u_init_positions_data_texture;
+uniform sampler2D u_init_extra_data_texture;
+uniform bool u_is_after_first_render;
 
 in vec2 vUv;
 // out vec4 out_Color;
@@ -26,14 +29,23 @@ layout (location = 1) out vec4 oFragColor1;
 
 void main() {
   vec3 previousPosition = texture(u_positions_data_texture, vUv).xyz;
+  vec3 originalPosition = texture(u_init_positions_data_texture, vUv).xyz;
+  vec3 originalExtra = texture(u_init_extra_data_texture, vUv).xyz;
   vec3 previous_extra = texture(u_extra_data_texture, vUv).xyz;
 
-  float speed = mix(1.0, 100.0, previous_extra.x);
-
-  previousPosition.x += (speed * 0.0001);
+  if(u_is_after_first_render) {
+    
+    float speed = mix(1.0, 100.0, previous_extra.x);
   
-  if (previousPosition.x > 2.0) previousPosition.x = -2.0;
-
+    previousPosition.x += (speed * 0.0001);
+    
+    if (previousPosition.x > 2.0) previousPosition.x = -2.0;
+  
+  } else {
+    previousPosition = originalPosition;
+    previous_extra = originalExtra;
+  }
+  
   oFragColor0 = vec4(previousPosition, 1.0);
   oFragColor1 = vec4(previous_extra, 1.0);
 }
@@ -44,6 +56,9 @@ export class GPGPUSimulationMaterial extends RawShaderMaterial {
     time: IUniform<number>
     u_positions_data_texture: IUniform<Texture | null>
     u_extra_data_texture: IUniform<Texture | null>
+    u_init_positions_data_texture: IUniform<Texture | null>
+    u_init_extra_data_texture: IUniform<Texture | null>
+    u_is_after_first_render: IUniform<Boolean>
   }
 
   constructor() {
@@ -51,6 +66,9 @@ export class GPGPUSimulationMaterial extends RawShaderMaterial {
       time: { value: 0 },
       u_positions_data_texture: { value: null },
       u_extra_data_texture: { value: null },
+      u_init_positions_data_texture: { value: null },
+      u_init_extra_data_texture: { value: null },
+      u_is_after_first_render: { value: false },
     }
 
     super({
