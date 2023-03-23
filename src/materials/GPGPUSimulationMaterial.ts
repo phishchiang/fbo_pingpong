@@ -17,7 +17,8 @@ const fragmentShader = /* glsl */ `#version 300 es
 precision highp float;
 
 uniform float u_time;
-uniform float progress;
+uniform float randomness;
+uniform float air_resistance;
 uniform sampler2D u_init_positions_data_texture;
 uniform sampler2D u_init_extra_data_texture;
 uniform sampler2D u_positions_data_texture;
@@ -145,13 +146,12 @@ void main() {
 
   if(u_is_after_first_render) {
 
+    // Set acceleration
     vec3 acceleration = vec3(0.0);
-
     vec3 noise_val = curlNoise(
-      previous_positions * 0.2 * progress + u_time * 0.05
+      previous_positions * 0.2 * randomness + u_time * 0.05
     );
     acceleration += noise_val;
-
     
     // set boundary
     float boundary_radius = 3.0;
@@ -159,13 +159,16 @@ void main() {
     vec3 boundary_dir = -normalize(previous_positions - vec3(0.0));
     float boundary_force = smoothstep(boundary_radius * 0.5, boundary_radius, dist_to_center);
     acceleration += boundary_dir * boundary_force * 0.5;
-    
+
+    // Set velocity
     previous_velocity += acceleration * 0.002;
-    float speed = mix(1.0, 4.0, previous_extra.x);
-    previous_positions += previous_velocity * speed;
-    previous_velocity *= 0.9;
+    float velocity_random = mix(1.0, 4.0, previous_extra.x);
+    previous_velocity *= (1.0 - mix(0.05, 1.0, air_resistance)); // air resistance
+
+    // Set position
+    previous_positions += previous_velocity * velocity_random;
     
-    // previous_positions.x += (speed * 0.0001);
+    // previous_positions.x += (velocity_random * 0.0001);
     // if (previous_positions.x > 2.0) previous_positions.x = -2.0;
   
   } else {
@@ -182,7 +185,8 @@ void main() {
 export class GPGPUSimulationMaterial extends RawShaderMaterial {
   declare uniforms: {
     u_time: IUniform<number>
-    progress: IUniform<number>
+    randomness: IUniform<number>
+    air_resistance: IUniform<number>
     u_positions_data_texture: IUniform<Texture | null>
     u_velocity_data_texture: IUniform<Texture | null>
     u_extra_data_texture: IUniform<Texture | null>
@@ -194,7 +198,8 @@ export class GPGPUSimulationMaterial extends RawShaderMaterial {
   constructor() {
     const uniforms: GPGPUSimulationMaterial['uniforms'] = {
       u_time: { value: 0 },
-      progress: { value: 0.5 },
+      randomness: { value: 0.5 },
+      air_resistance: { value: 0.1 },
       u_positions_data_texture: { value: null },
       u_velocity_data_texture: { value: null },
       u_extra_data_texture: { value: null },

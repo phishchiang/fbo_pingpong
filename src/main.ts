@@ -205,12 +205,13 @@ export class Sketch {
     this.time += 0.05
     if(this._DummyInstancedMesh){
       this._DummyInstancedMesh.material.uniforms.time.value = this.time
-      this._DummyInstancedMesh.material.uniforms.progress.value = this._debug.settings.progress
+      // this._DummyInstancedMesh.material.uniforms.progress.value = this._debug.settings.progress
     }
     requestAnimationFrame(this.render)
 
     this._quad_simulation!.material.uniforms.u_time.value = this.time
-    this._quad_simulation!.material.uniforms.progress.value = this._debug.settings.progress
+    this._quad_simulation!.material.uniforms.randomness.value = this._debug.settings.randomness
+    this._quad_simulation!.material.uniforms.air_resistance.value = this._debug.settings.air_resistance
     this._quad_simulation!.material.uniforms.u_is_after_first_render.value = !this._isFirstRender
   
     this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]

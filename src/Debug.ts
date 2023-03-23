@@ -4,14 +4,17 @@ export class Debug {
   private gui: GUI
 
   public settings: {
-    progress: number
+    randomness: number
+    air_resistance: number
   }
 
   constructor() {
     this.settings = {
-      progress: 0.6,
+      randomness: 0.6,
+      air_resistance: 0.1,
     }
     this.gui = new GUI()
-    this.gui.add(this.settings, "progress", 0, 1, 0.01)
+    this.gui.add(this.settings, "randomness", 0, 1, 0.01)
+    this.gui.add(this.settings, "air_resistance", 0, 1, 0.01)
   }
 }
