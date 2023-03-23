@@ -210,6 +210,7 @@ export class Sketch {
     requestAnimationFrame(this.render)
 
     this._quad_simulation!.material.uniforms.u_time.value = this.time
+    this._quad_simulation!.material.uniforms.progress.value = this._debug.settings.progress
     this._quad_simulation!.material.uniforms.u_is_after_first_render.value = !this._isFirstRender
   
     this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
