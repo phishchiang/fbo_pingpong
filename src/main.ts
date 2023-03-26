@@ -26,6 +26,7 @@ import { StartingShaderMateiral } from './/materials/StartingShaderMateiral'
 import { PointsShaderMateiral } from './/materials/PointsShaderMateiral'
 import { GPGPURenderMaterial } from './materials/GPGPURenderMaterial'
 import { GPGPUSimulationMaterial } from './materials/GPGPUSimulationMaterial'
+import { GPGPUDebugMaterial } from './materials/GPGPUDebugMaterial'
 import { PostMaterial } from './/materials/PostMaterial'
 import { DummyInstancedMesh } from './/objects/DummyInstancedMesh'
 import { BasicGeo } from './/objects/BasicGeo'
@@ -59,6 +60,7 @@ export class Sketch {
   private _quad?: Mesh<BufferGeometry, PostMaterial>
   private _pointsMat: PointsShaderMateiral
   private _quad_simulation?: Mesh<BufferGeometry, RawShaderMaterial>
+  private _quad_debug: Mesh<BufferGeometry, GPGPUDebugMaterial>
   private _particles_render?: Points<BufferGeometry, RawShaderMaterial>
   private _renderTargets: Array<WebGLMultipleRenderTargets>
   private _isFirstRender = true
@@ -83,7 +85,9 @@ export class Sketch {
     this.renderer_rt_layer.setClearColor(0x000000, 1)
 
     this.container.appendChild(this.renderer.domElement)
-    // this.container.appendChild(this.renderer_rt_layer.domElement) // renderer_rt_layer
+    this.container.appendChild(this.renderer_rt_layer.domElement) // renderer_rt_layer
+
+    // this.renderer.autoClear = false // important!
     
     this.camera = new PerspectiveCamera(
       70,
@@ -127,8 +131,9 @@ export class Sketch {
     this._particles_render.frustumCulled = false // Avoid disappearing when moving cam
 
     this._quad_simulation = new Mesh(new PlaneGeometry(2, 2), new GPGPUSimulationMaterial())
+    this._quad_debug = new Mesh(new PlaneGeometry(2, 2), new GPGPUDebugMaterial())
 
-    this._renderTargets = Array.from(Array(2)).map(() => new WebGLMultipleRenderTargets(numParticles, numParticles, 3, {
+    this._renderTargets = Array.from(Array(2)).map(() => new WebGLMultipleRenderTargets(numParticles, numParticles, 4, {
       minFilter: NearestFilter,
       magFilter: NearestFilter,
       format: RGBAFormat,
@@ -143,7 +148,7 @@ export class Sketch {
     
     this._quad_simulation!.material.uniforms.u_init_positions_data_texture.value = positions_data_texture
     this._quad_simulation!.material.uniforms.u_init_extra_data_texture.value = extra_data_texture
-    console.log(this._quad_simulation)
+    console.log(this._quad_debug)
   }
 
   setupResize() {
@@ -194,12 +199,7 @@ export class Sketch {
     }
   }
 
-  update(){
-    
-  }
-
   render() {
-    this.update()
 
     if (!this.isPlaying) return
     this.time += 0.05
@@ -208,6 +208,9 @@ export class Sketch {
       // this._DummyInstancedMesh.material.uniforms.progress.value = this._debug.settings.progress
     }
     requestAnimationFrame(this.render)
+    // this.renderer.clear()
+
+    // this.renderer.setViewport(0, 0, this.width, this.height)
 
     this._quad_simulation!.material.uniforms.u_time.value = this.time
     this._quad_simulation!.material.uniforms.randomness.value = this._debug.settings.randomness
@@ -217,21 +220,44 @@ export class Sketch {
     this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
     this._quad_simulation!.material.uniforms.u_velocity_data_texture.value = this._renderTargets[0].texture[1]
     this._quad_simulation!.material.uniforms.u_extra_data_texture.value = this._renderTargets[0].texture[2]
+    this._quad_simulation!.material.uniforms.u_speed_data_texture.value = this._renderTargets[0].texture[3]
     this.renderer.setRenderTarget(this._renderTargets[1])
     this.renderer.render(this._quad_simulation!, this.camera)
 
-    this._particles_render!.material.uniforms.u_positions_data_texture.value = this._renderTargets[1]!.texture[0]
-    this._particles_render!.material.uniforms.u_velocity_data_texture.value = this._renderTargets[1]!.texture[1]
-    this._particles_render!.material.uniforms.u_extra_data_texture.value = this._renderTargets[1]!.texture[2]
+    
+
+    this._particles_render!.material.uniforms.u_positions_data_texture.value = this._renderTargets[1].texture[0]
+    this._particles_render!.material.uniforms.u_velocity_data_texture.value = this._renderTargets[1].texture[1]
+    this._particles_render!.material.uniforms.u_extra_data_texture.value = this._renderTargets[1].texture[2]
+    this._particles_render!.material.uniforms.u_speed_data_texture.value = this._renderTargets[1].texture[3]
     this.renderer.setRenderTarget(null)
     this.renderer.render(this._particles_render!, this.camera)
 
-    // // renderer_rt_layer
-    // this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[1]
+
+    // renderer_rt_layer
+    this.renderer_rt_layer.setRenderTarget(this._renderTargets[1])
+    this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+    this.renderer_rt_layer.setRenderTarget(null)
+    this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+    
+    // this.renderer.setViewport( 0, 0, this.width * 0.2, this.width * 0.2 )
+    // this._quad_debug!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
+    // this._quad_debug!.material.uniforms.u_velocity_data_texture.value = this._renderTargets[0].texture[1]
+    // this._quad_debug!.material.uniforms.u_extra_data_texture.value = this._renderTargets[0].texture[2]
+    // this._quad_debug!.material.uniforms.u_speed_data_texture.value = this._renderTargets[0].texture[3]
     // this.renderer_rt_layer.setRenderTarget(this._renderTargets[1])
-    // this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+    // this.renderer_rt_layer.render(this._quad_debug!, this.camera)
     // this.renderer_rt_layer.setRenderTarget(null)
-    // this.renderer_rt_layer.render(this._quad_simulation!, this.camera)
+    // this.renderer_rt_layer.render(this._quad_debug!, this.camera)
+
+
+    // this.renderer.setViewport( this.width * 0.2, 0, this.width * 0.2, this.height * 0.2 )
+    // this.renderer.render(this.scene, this.camera)
+    // this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[1]
+    // this.renderer.setRenderTarget(this._renderTargets[1])
+    // this.renderer.render(this._quad_simulation!, this.camera)
+    // this.renderer.setRenderTarget(null)
+    // this.renderer.render(this._quad_simulation!, this.camera)
 
     // swap our fbos, there are dozen of ways to do this, this is just one of them
     const temp = this._renderTargets[1]

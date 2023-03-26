@@ -24,6 +24,7 @@ uniform sampler2D u_init_extra_data_texture;
 uniform sampler2D u_positions_data_texture;
 uniform sampler2D u_velocity_data_texture;
 uniform sampler2D u_extra_data_texture;
+uniform sampler2D u_speed_data_texture;
 uniform bool u_is_after_first_render;
 
 in vec2 vUv;
@@ -31,6 +32,7 @@ in vec2 vUv;
 layout (location = 0) out vec4 oFragColor0;
 layout (location = 1) out vec4 oFragColor1;
 layout (location = 2) out vec4 oFragColor2;
+layout (location = 3) out vec4 oFragColor3;
 
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0;  }
 
@@ -143,8 +145,12 @@ void main() {
   vec3 previous_extra = texture(u_extra_data_texture, vUv).xyz;
   vec3 previous_velocity = texture(u_velocity_data_texture, vUv).xyz;
 
+  float previous_speed = 0.0;
+
 
   if(u_is_after_first_render) {
+
+    vec3 saved_previous_positions = previous_positions;
 
     // Set acceleration
     vec3 acceleration = vec3(0.0);
@@ -170,6 +176,8 @@ void main() {
     
     // previous_positions.x += (velocity_random * 0.0001);
     // if (previous_positions.x > 2.0) previous_positions.x = -2.0;
+
+    previous_speed = distance(previous_positions, saved_previous_positions);
   
   } else {
     previous_positions = originalPosition;
@@ -179,6 +187,7 @@ void main() {
   oFragColor0 = vec4(previous_positions, 1.0);
   oFragColor1 = vec4(previous_velocity, 1.0);
   oFragColor2 = vec4(previous_extra, 1.0);
+  oFragColor3 = vec4(vec3(previous_speed), 1.0);
 }
 `
 
@@ -190,6 +199,7 @@ export class GPGPUSimulationMaterial extends RawShaderMaterial {
     u_positions_data_texture: IUniform<Texture | null>
     u_velocity_data_texture: IUniform<Texture | null>
     u_extra_data_texture: IUniform<Texture | null>
+    u_speed_data_texture: IUniform<Texture | null>
     u_init_positions_data_texture: IUniform<Texture | null>
     u_init_extra_data_texture: IUniform<Texture | null>
     u_is_after_first_render: IUniform<Boolean>
@@ -203,6 +213,7 @@ export class GPGPUSimulationMaterial extends RawShaderMaterial {
       u_positions_data_texture: { value: null },
       u_velocity_data_texture: { value: null },
       u_extra_data_texture: { value: null },
+      u_speed_data_texture: { value: null },
       u_init_positions_data_texture: { value: null },
       u_init_extra_data_texture: { value: null },
       u_is_after_first_render: { value: false },
