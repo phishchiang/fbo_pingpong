@@ -232,19 +232,19 @@ export class Sketch {
 
     // render multi debug layers
     this.renderer.setViewport(0, 0, this._quad_debug_size, this._quad_debug_size)
-    this._quad_debug!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
+    this._quad_debug!.material.uniforms.u_debug_data_texture.value = this._renderTargets[0].texture[0]
     this.renderer.render(this._quad_debug!, this.camera)
     
     this.renderer.setViewport(this._quad_debug_size, 0, this._quad_debug_size, this._quad_debug_size)
-    this._quad_debug!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[1]
+    this._quad_debug!.material.uniforms.u_debug_data_texture.value = this._renderTargets[0].texture[1]
     this.renderer.render(this._quad_debug!, this.camera)
     
     this.renderer.setViewport(this._quad_debug_size * 2, 0, this._quad_debug_size, this._quad_debug_size)
-    this._quad_debug!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[2]
+    this._quad_debug!.material.uniforms.u_debug_data_texture.value = this._renderTargets[0].texture[2]
     this.renderer.render(this._quad_debug!, this.camera)
 
     this.renderer.setViewport(this._quad_debug_size * 3, 0, this._quad_debug_size, this._quad_debug_size)
-    this._quad_debug!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[3]
+    this._quad_debug!.material.uniforms.u_debug_data_texture.value = this._renderTargets[0].texture[3]
     this.renderer.render(this._quad_debug!, this.camera)
 
 
