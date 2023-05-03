@@ -7,20 +7,33 @@ export class GPGPUGeometry extends BufferGeometry{
   public extras_float_array: Float32Array
   public uvs_float_array: Float32Array
   public indices_float_array: Float32Array
+  public positions_array_2nd_way: Float32Array
 
   constructor() {
     super()
-    this.numParticles = 200
+    this.numParticles = 100
     const positions_array = []
     const extras_array = []
     const uvs_array = []
     const indices_array = []
     let count = 0
     const r = 1
+
+    // 2nd way to generate the Float32Array
+    this.positions_array_2nd_way = new Float32Array(this.numParticles * this.numParticles * 4) 
+
     for (let j = 0; j < this.numParticles; j++) {
       for (let i = 0; i < this.numParticles; i++) {
-        // particle position
+        
+        // particle position by basic array
         positions_array.push(...[randFloat(-r, r), randFloat(-r, r), randFloat(-r, r), 0])
+        
+        // 2nd way to generate the Float32Array
+        const index = i * this.numParticles + j
+        this.positions_array_2nd_way[3 * index + 0] = randFloat(-r, r)
+        this.positions_array_2nd_way[3 * index + 1] = randFloat(-r, r)
+        this.positions_array_2nd_way[3 * index + 2] = randFloat(-r, r)
+        this.positions_array_2nd_way[3 * index + 3] = 1
 
         // random data
         extras_array.push(...[Math.random(), Math.random(), Math.random(), 0])

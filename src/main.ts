@@ -113,9 +113,9 @@ export class Sketch {
   initGPGPU() {
 
     this._GPGPUGeometry = new GPGPUGeometry()
-    let { numParticles, positions_float_array, extras_float_array} = this._GPGPUGeometry
+    let { numParticles, positions_float_array, extras_float_array, positions_array_2nd_way} = this._GPGPUGeometry
     
-    const positions_data_texture = new DataTexture(positions_float_array, numParticles, numParticles, RGBAFormat, FloatType)
+    const positions_data_texture = new DataTexture(positions_array_2nd_way, numParticles, numParticles, RGBAFormat, FloatType)
     positions_data_texture.needsUpdate = true
     const extra_data_texture = new DataTexture(extras_float_array, numParticles, numParticles, RGBAFormat, FloatType)
     extra_data_texture.needsUpdate = true
@@ -144,7 +144,7 @@ export class Sketch {
     // Pass this way instead and handle that in the 1st frame of the Simulation shader
     this._quad_simulation!.material.uniforms.u_init_positions_data_texture.value = positions_data_texture
     this._quad_simulation!.material.uniforms.u_init_extra_data_texture.value = extra_data_texture
-    console.log(this._quad_debug)
+    // console.log(this._quad_debug)
   }
 
   setupResize() {
