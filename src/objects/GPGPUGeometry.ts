@@ -30,10 +30,10 @@ export class GPGPUGeometry extends BufferGeometry{
         
         // 2nd way to generate the Float32Array
         const index = i * this.numParticles + j
-        this.positions_array_2nd_way[3 * index + 0] = randFloat(-r, r)
-        this.positions_array_2nd_way[3 * index + 1] = randFloat(-r, r)
-        this.positions_array_2nd_way[3 * index + 2] = randFloat(-r, r)
-        this.positions_array_2nd_way[3 * index + 3] = 1
+        this.positions_array_2nd_way[4 * index + 0] = randFloat(-r, r)
+        this.positions_array_2nd_way[4 * index + 1] = randFloat(-r, r)
+        this.positions_array_2nd_way[4 * index + 2] = randFloat(-r, r)
+        this.positions_array_2nd_way[4 * index + 3] = 1
 
         // random data
         extras_array.push(...[Math.random(), Math.random(), Math.random(), 0])
