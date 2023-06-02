@@ -18,6 +18,10 @@ import {
   BufferAttribute,
   RawShaderMaterial,
   NearestFilter,
+  CameraHelper,
+  BoxGeometry,
+  MeshBasicMaterial,
+  AxesHelper,
 } from 'three'
 import { randFloat } from 'three/src/math/MathUtils'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -52,19 +56,20 @@ export class Sketch {
   private msh_plane: Mesh
   private _debug: Debug
   private _DummyInstancedMesh: DummyInstancedMesh
-  private _BasicGeo: BasicGeo
-  private _PointsGeo: PointsGeo
-  private _point_msh: Points<PointsGeo, PointsShaderMateiral>
+  private _Basic_GEO: BasicGeo
+  private _Points_GEO: PointsGeo
+  private _point_PT: Points<PointsGeo, PointsShaderMateiral>
   private _GPGPUGeometry: GPGPUGeometry
   private _renderTarget?: WebGLRenderTarget
   private _quad?: Mesh<BufferGeometry, PostMaterial>
-  private _pointsMat: PointsShaderMateiral
+  private _points_MAT: PointsShaderMateiral
   private _quad_simulation?: Mesh<BufferGeometry, RawShaderMaterial>
   private _quad_debug: Mesh<BufferGeometry, GPGPUDebugMaterial>
   private _quad_debug_size: number
-  private _particles_render?: Points<BufferGeometry, RawShaderMaterial>
+  private _particles_PT?: Points<BufferGeometry, RawShaderMaterial>
   private _renderTargets: Array<WebGLMultipleRenderTargets>
   private _isFirstRender = true
+  private _axesHelper = new AxesHelper(5)
 
   constructor(options: { dom: HTMLElement }) {
     this.scene = new Scene()
@@ -81,6 +86,7 @@ export class Sketch {
     this._debug = new Debug()
     this._quad_debug_size = this.height * 0.2
     this.container.appendChild(this.renderer.domElement)
+    this.scene.add(this._axesHelper)
 
     this.renderer.autoClear = false // turn off auto clear for debug multi layers
     
@@ -122,8 +128,8 @@ export class Sketch {
     
 
 
-    this._particles_render = new Points(this._GPGPUGeometry, new GPGPURenderMaterial())
-    this._particles_render.frustumCulled = false // Avoid disappearing when moving cam
+    this._particles_PT = new Points(this._GPGPUGeometry, new GPGPURenderMaterial())
+    this._particles_PT.frustumCulled = false // Avoid disappearing when moving cam
 
     this._quad_simulation = new Mesh(new PlaneGeometry(2, 2), new GPGPUSimulationMaterial())
     this._quad_debug = new Mesh(new PlaneGeometry(2, 2), new GPGPUDebugMaterial())
@@ -136,6 +142,8 @@ export class Sketch {
       depthBuffer: false,
       stencilBuffer: false
     }))
+
+    this.scene.add(this._particles_PT)
 
     // you will get the chrome warning for Texture is immutable
     // this._renderTargets[0].texture[0] = positions_data_texture
@@ -170,18 +178,18 @@ export class Sketch {
     // GLB loading
     const gltf = await gltfLoader.loadAsync(MSH_Monkey_url)
     const geometry = (gltf.scene.children[0] as Mesh).geometry
-    this._BasicGeo = new BasicGeo()
+    this._Basic_GEO = new BasicGeo()
 
     // Instanced Mesh
-    this._DummyInstancedMesh = new DummyInstancedMesh(this._BasicGeo)
-    this.scene.add(this._DummyInstancedMesh)
+    this._DummyInstancedMesh = new DummyInstancedMesh(this._Basic_GEO)
+    // this.scene.add(this._DummyInstancedMesh)
 
     // WebGL Points
-    this._PointsGeo = new PointsGeo()
-    this._pointsMat = new PointsShaderMateiral()
-    this._point_msh = new Points(this._PointsGeo, this._pointsMat)
-    this._point_msh.material.uniforms.u_viewport.value.copy(new Vector2(this.width, this.height))
-    // this.scene.add(this._point_msh)
+    this._Points_GEO = new PointsGeo()
+    this._points_MAT = new PointsShaderMateiral()
+    this._point_PT = new Points(this._Points_GEO, this._points_MAT)
+    this._point_PT.material.uniforms.u_viewport.value.copy(new Vector2(this.width, this.height))
+    // this.scene.add(this._point_PT)
   }
 
   stop() {
@@ -222,12 +230,12 @@ export class Sketch {
     this.renderer.setRenderTarget(this._renderTargets[1])
     this.renderer.render(this._quad_simulation!, this.camera)
 
-    this._particles_render!.material.uniforms.u_positions_data_texture.value = this._renderTargets[1].texture[0]
-    this._particles_render!.material.uniforms.u_velocity_data_texture.value = this._renderTargets[1].texture[1]
-    this._particles_render!.material.uniforms.u_extra_data_texture.value = this._renderTargets[1].texture[2]
-    this._particles_render!.material.uniforms.u_speed_data_texture.value = this._renderTargets[1].texture[3]
+    this._particles_PT!.material.uniforms.u_positions_data_texture.value = this._renderTargets[1].texture[0]
+    this._particles_PT!.material.uniforms.u_velocity_data_texture.value = this._renderTargets[1].texture[1]
+    this._particles_PT!.material.uniforms.u_extra_data_texture.value = this._renderTargets[1].texture[2]
+    this._particles_PT!.material.uniforms.u_speed_data_texture.value = this._renderTargets[1].texture[3]
     this.renderer.setRenderTarget(null)
-    this.renderer.render(this._particles_render!, this.camera)
+    this.renderer.render(this.scene!, this.camera)
 
 
     // render multi debug layers
