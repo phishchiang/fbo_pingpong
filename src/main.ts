@@ -22,6 +22,9 @@ import {
   BoxGeometry,
   MeshBasicMaterial,
   AxesHelper,
+  DepthTexture,
+  DepthFormat,
+  UnsignedIntType,
 } from 'three'
 import { randFloat } from 'three/src/math/MathUtils'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -47,6 +50,7 @@ export class Sketch {
   private width: number
   private height: number
   private camera: PerspectiveCamera
+  private shadow_CAM: PerspectiveCamera
   private controls: OrbitControls
   private time: number
   private imageAspect: number
@@ -66,8 +70,10 @@ export class Sketch {
   private _quad_simulation?: Mesh<BufferGeometry, RawShaderMaterial>
   private _quad_debug: Mesh<BufferGeometry, GPGPUDebugMaterial>
   private _quad_debug_size: number
-  private _particles_PT?: Points<BufferGeometry, RawShaderMaterial>
+  private _particles_PT: Points<BufferGeometry, RawShaderMaterial>
   private _renderTargets: Array<WebGLMultipleRenderTargets>
+  private _depth_RT: WebGLRenderTarget
+  private _debug_MAT: GPGPUDebugMaterial
   private _isFirstRender = true
   private _axesHelper = new AxesHelper(5)
 
@@ -102,6 +108,17 @@ export class Sketch {
     this.time = 0
     this.isPlaying = true
 
+    this.shadow_CAM = new PerspectiveCamera( 45, 1, 0.1, 100)
+    this.shadow_CAM.position.set(4, 8, 5)
+    this.shadow_CAM.lookAt(0, 0, 0)
+    this.scene.add(this.shadow_CAM)
+
+    this.shadow_CAM.updateProjectionMatrix()
+    this.shadow_CAM.updateMatrixWorld()
+  
+    const _cameraHelper = new CameraHelper(this.shadow_CAM)
+    this.scene.add(_cameraHelper)
+
     this.addObjects()
     this.initpost()
     this.initGPGPU()
@@ -114,6 +131,17 @@ export class Sketch {
     this._renderTarget = new WebGLRenderTarget(this.width, this.height)
     this._quad = new Mesh(new PlaneGeometry(2, 2), new PostMaterial())
     this._quad?.material.uniforms.u_size.value.copy(new Vector2(this.width, this.height))
+
+    this._depth_RT = new WebGLRenderTarget(this.height, this.height, {
+      minFilter: NearestFilter,
+      magFilter: NearestFilter,
+      format: RGBAFormat,
+      type: FloatType,
+      stencilBuffer: false,
+    })
+    const depth_texture = new DepthTexture(this.width, this.height, UnsignedIntType)
+    depth_texture.format = DepthFormat
+    this._depth_RT.depthTexture = depth_texture
   }
 
   initGPGPU() {
@@ -132,7 +160,9 @@ export class Sketch {
     this._particles_PT.frustumCulled = false // Avoid disappearing when moving cam
 
     this._quad_simulation = new Mesh(new PlaneGeometry(2, 2), new GPGPUSimulationMaterial())
-    this._quad_debug = new Mesh(new PlaneGeometry(2, 2), new GPGPUDebugMaterial())
+
+    this._debug_MAT = new GPGPUDebugMaterial()
+    this._quad_debug = new Mesh(new PlaneGeometry(2, 2), this._debug_MAT)
 
     this._renderTargets = Array.from(Array(2)).map(() => new WebGLMultipleRenderTargets(numParticles, numParticles, 4, {
       minFilter: NearestFilter,
@@ -222,6 +252,11 @@ export class Sketch {
     this._quad_simulation!.material.uniforms.u_is_after_first_render.value = !this._isFirstRender
 
 
+    // Render depth to render target for shadow
+    this.renderer.setRenderTarget(this._depth_RT)
+    this.renderer.clear(false, true, false)
+    this.renderer.render(this._particles_PT, this.shadow_CAM)
+
     // Set up render targets 
     this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
     this._quad_simulation!.material.uniforms.u_velocity_data_texture.value = this._renderTargets[0].texture[1]
@@ -230,10 +265,10 @@ export class Sketch {
     this.renderer.setRenderTarget(this._renderTargets[1])
     this.renderer.render(this._quad_simulation!, this.camera)
 
-    this._particles_PT!.material.uniforms.u_positions_data_texture.value = this._renderTargets[1].texture[0]
-    this._particles_PT!.material.uniforms.u_velocity_data_texture.value = this._renderTargets[1].texture[1]
-    this._particles_PT!.material.uniforms.u_extra_data_texture.value = this._renderTargets[1].texture[2]
-    this._particles_PT!.material.uniforms.u_speed_data_texture.value = this._renderTargets[1].texture[3]
+    this._particles_PT.material.uniforms.u_positions_data_texture.value = this._renderTargets[1].texture[0]
+    this._particles_PT.material.uniforms.u_velocity_data_texture.value = this._renderTargets[1].texture[1]
+    this._particles_PT.material.uniforms.u_extra_data_texture.value = this._renderTargets[1].texture[2]
+    this._particles_PT.material.uniforms.u_speed_data_texture.value = this._renderTargets[1].texture[3]
     this.renderer.setRenderTarget(null)
     this.renderer.render(this.scene!, this.camera)
 
@@ -254,6 +289,12 @@ export class Sketch {
     this.renderer.setViewport(this._quad_debug_size * 3, 0, this._quad_debug_size, this._quad_debug_size)
     this._quad_debug!.material.uniforms.u_debug_data_texture.value = this._renderTargets[0].texture[3]
     this.renderer.render(this._quad_debug!, this.camera)
+
+    this.renderer.setViewport(this._quad_debug_size * 4, 0, this._quad_debug_size, this._quad_debug_size)
+    this._debug_MAT.uniforms.u_is_depth.value = true
+    this._debug_MAT.uniforms.u_debug_depth_texture.value = this._depth_RT.depthTexture
+    this.renderer.render(this._quad_debug!, this.shadow_CAM)
+    this._debug_MAT.uniforms.u_is_depth.value = false
 
 
     // swap our fbos, there are dozen of ways to do this, this is just one of them
