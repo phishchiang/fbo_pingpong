@@ -240,6 +240,9 @@ export class Sketch {
 
   render() {
 
+    this.shadow_CAM.position.set(this._debug.settings.lightX, this._debug.settings.lightY, this._debug.settings.lightZ)
+
+
     if (!this.isPlaying) return
     this.time += 0.05
     if(this._DummyInstancedMesh){
