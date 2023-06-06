@@ -258,6 +258,8 @@ export class Sketch {
     this._quad_simulation!.material.uniforms.randomness.value = this._debug.settings.randomness
     this._quad_simulation!.material.uniforms.air_resistance.value = this._debug.settings.air_resistance
     this._quad_simulation!.material.uniforms.u_is_after_first_render.value = !this._isFirstRender
+    this._particles_PT.material.uniforms.u_bias.value = this._debug.settings.shadow_bias
+
 
 
     // Render depth to render target for shadow

@@ -33,7 +33,7 @@ void main() {
   v_projcam_uv = u_projection_matrix * u_matrix_world_inverse * modelMatrix * vec4( position, 1.0 );
   
   // gl_PointSize = 5.0 * size_random;
-  gl_PointSize = 50. * ( 1. / - (modelViewMatrix * vec4(position, 1.0)).z) * size_random;
+  gl_PointSize = 20. * ( 1. / - (modelViewMatrix * vec4(position, 1.0)).z) * size_random;
 }
 `
 
@@ -41,6 +41,7 @@ const fragmentShader = /* glsl */ `#version 300 es
 precision highp float;
 #include <packing>
 
+uniform float u_bias;
 uniform sampler2D u_depth_map;
 uniform float u_cam_near;
 uniform float u_cam_far;
@@ -60,10 +61,11 @@ void main() {
   vec4 v_cam_uv_with_zoom = v_projcam_uv / v_projcam_uv.w;
   vec2 v_cam_uv_fianl = (v_cam_uv_with_zoom.xy * 0.5) + 0.5;
 
-  // float depth = readDepth( u_depth_map, v_cam_uv_fianl );
-  float bias = 0.005;
-  vec3 depth_render = texture(u_depth_map, v_cam_uv_fianl).xyz;
-  float shadow_value = v_cam_uv_with_zoom.z < depth_render.x - bias? 1.0 : 0.0;
+  float bias = u_bias;
+  float depth = readDepth( u_depth_map, v_cam_uv_fianl );
+  float shadow_value = v_cam_uv_with_zoom.z < depth - bias? 1.0 : 0.085;
+
+  float shadow_value_simpler_ver = depth > 0.9? 1.0: 0.085; // my simple shadow
 
   float dist = length(gl_PointCoord - vec2(0.5));
   if(dist > 0.5) discard;
@@ -75,6 +77,7 @@ void main() {
 export class GPGPURenderMaterial extends RawShaderMaterial {
   declare uniforms: {
     time: IUniform<number>
+    u_bias: IUniform<number>
     u_positions_data_texture: IUniform<Texture | null>
     u_velocity_data_texture: IUniform<Texture | null>
     u_extra_data_texture: IUniform<Texture | null>
@@ -89,6 +92,7 @@ export class GPGPURenderMaterial extends RawShaderMaterial {
   constructor(_projectionMatrix: Matrix4, _matrixWorldInverse: Matrix4, _u_cam_near: number, _u_cam_far: number) {
     const uniforms: GPGPURenderMaterial['uniforms'] = {
       time: { value: 0 },
+      u_bias: { value: -0.005 },
       u_positions_data_texture: { value: null },
       u_velocity_data_texture: { value: null },
       u_extra_data_texture: { value: null },
