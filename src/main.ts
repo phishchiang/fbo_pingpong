@@ -85,7 +85,7 @@ export class Sketch {
     this.renderer = new WebGLRenderer( { antialias: true })
     this.renderer.setPixelRatio(window.devicePixelRatio)
     this.renderer.setSize(this.width, this.height)
-    this.renderer.setClearColor(0x000000, 1)
+    this.renderer.setClearColor(0x111111, 1)
     this.renderer.physicallyCorrectLights = true
     this.render = this.render.bind(this)
     this.imageAspect = 1
@@ -108,7 +108,7 @@ export class Sketch {
     this.time = 0
     this.isPlaying = true
 
-    this.shadow_CAM = new PerspectiveCamera( 45, 1, 0.1, 100)
+    this.shadow_CAM = new PerspectiveCamera( 45, 1, 0.1, 15)
     this.shadow_CAM.position.set(4, 8, 5)
     this.shadow_CAM.lookAt(0, 0, 0)
     this.scene.add(this.shadow_CAM)
@@ -156,7 +156,10 @@ export class Sketch {
     
 
 
-    this._particles_PT = new Points(this._GPGPUGeometry, new GPGPURenderMaterial())
+    this._particles_PT = new Points(this._GPGPUGeometry, new GPGPURenderMaterial(
+      this.shadow_CAM.projectionMatrix, 
+      this.shadow_CAM.matrixWorldInverse,
+    ))
     this._particles_PT.frustumCulled = false // Avoid disappearing when moving cam
 
     this._quad_simulation = new Mesh(new PlaneGeometry(2, 2), new GPGPUSimulationMaterial())
@@ -254,6 +257,14 @@ export class Sketch {
 
     // Render depth to render target for shadow
     this.renderer.setRenderTarget(this._depth_RT)
+
+    /*
+      To avoid Feedback loop of FBO and active texture.
+      The current FBO should be its depthTexture instead of out_Color,
+      so free to assign whatever into u_depth_map except itself.
+    */
+    this._particles_PT.material.uniforms.u_depth_map.value = this._renderTargets[0].texture[0]
+
     this.renderer.clear(false, true, false)
     this.renderer.render(this._particles_PT, this.shadow_CAM)
 
@@ -269,8 +280,9 @@ export class Sketch {
     this._particles_PT.material.uniforms.u_velocity_data_texture.value = this._renderTargets[1].texture[1]
     this._particles_PT.material.uniforms.u_extra_data_texture.value = this._renderTargets[1].texture[2]
     this._particles_PT.material.uniforms.u_speed_data_texture.value = this._renderTargets[1].texture[3]
+    this._particles_PT.material.uniforms.u_depth_map.value = this._depth_RT.depthTexture
     this.renderer.setRenderTarget(null)
-    this.renderer.render(this.scene!, this.camera)
+    this.renderer.render(this.scene, this.camera)
 
 
     // render multi debug layers
