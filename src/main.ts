@@ -159,6 +159,8 @@ export class Sketch {
     this._particles_PT = new Points(this._GPGPUGeometry, new GPGPURenderMaterial(
       this.shadow_CAM.projectionMatrix, 
       this.shadow_CAM.matrixWorldInverse,
+      this.shadow_CAM.near,
+      this.shadow_CAM.far,
     ))
     this._particles_PT.frustumCulled = false // Avoid disappearing when moving cam
 

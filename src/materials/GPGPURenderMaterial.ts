@@ -42,6 +42,8 @@ precision highp float;
 #include <packing>
 
 uniform sampler2D u_depth_map;
+uniform float u_cam_near;
+uniform float u_cam_far;
 in vec3 v_color;
 
 in vec4 v_projcam_uv;
@@ -49,8 +51,8 @@ out vec4 out_Color;
 
 float readDepth( sampler2D depthSampler, vec2 coord ) {
   float fragCoordZ = texture( depthSampler, coord ).x;
-  float viewZ = perspectiveDepthToViewZ( fragCoordZ, 0.1, 15.0 );
-  return viewZToOrthographicDepth( viewZ, 0.1, 15.0 );
+  float viewZ = perspectiveDepthToViewZ( fragCoordZ, u_cam_near, u_cam_far );
+  return viewZToOrthographicDepth( viewZ, u_cam_near, u_cam_far );
 }
 
 void main() {
@@ -66,7 +68,7 @@ void main() {
   float dist = length(gl_PointCoord - vec2(0.5));
   if(dist > 0.5) discard;
   
-  out_Color = vec4(vec3(depth_render.x), 1.0);
+  out_Color = vec4(vec3(shadow_value), 1.0);
 }
 `
 
@@ -79,10 +81,12 @@ export class GPGPURenderMaterial extends RawShaderMaterial {
     u_speed_data_texture: IUniform<Texture | null>
     u_projection_matrix: IUniform<Matrix4>
     u_matrix_world_inverse: IUniform<Matrix4>
+    u_cam_near: IUniform<Number>
+    u_cam_far: IUniform<Number>
     u_depth_map: IUniform<Texture | null>
   }
 
-  constructor(_projectionMatrix: Matrix4, _matrixWorldInverse: Matrix4) {
+  constructor(_projectionMatrix: Matrix4, _matrixWorldInverse: Matrix4, _u_cam_near: number, _u_cam_far: number) {
     const uniforms: GPGPURenderMaterial['uniforms'] = {
       time: { value: 0 },
       u_positions_data_texture: { value: null },
@@ -91,6 +95,8 @@ export class GPGPURenderMaterial extends RawShaderMaterial {
       u_speed_data_texture: { value: null },
       u_projection_matrix: { value: _projectionMatrix },
       u_matrix_world_inverse: { value: _matrixWorldInverse },
+      u_cam_near: { value: _u_cam_near },
+      u_cam_far: { value: _u_cam_far },
       u_depth_map: { value: null },
     }
 
