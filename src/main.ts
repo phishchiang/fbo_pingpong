@@ -30,6 +30,7 @@ import { randFloat } from 'three/src/math/MathUtils'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Debug } from "./Debug"
 import { StartingShaderMateiral } from './/materials/StartingShaderMateiral'
+import { ShadowShaderMateiral } from './/materials/ShadowShaderMateiral'
 import { PointsShaderMateiral } from './/materials/PointsShaderMateiral'
 import { GPGPURenderMaterial } from './materials/GPGPURenderMaterial'
 import { GPGPUSimulationMaterial } from './materials/GPGPUSimulationMaterial'
@@ -55,7 +56,7 @@ export class Sketch {
   private time: number
   private imageAspect: number
   private isPlaying: boolean
-  private mat_plane: ShaderMaterial
+  private mat_plane: ShadowShaderMateiral
   private geo_plane: PlaneGeometry
   private msh_plane: Mesh
   private _debug: Debug
@@ -108,7 +109,7 @@ export class Sketch {
     this.time = 0
     this.isPlaying = true
 
-    this.shadow_CAM = new PerspectiveCamera( 45, 1, 0.1, 15)
+    this.shadow_CAM = new PerspectiveCamera( 45, 1, 1, 30)
     this.shadow_CAM.position.set(4, 8, 5)
     this.shadow_CAM.lookAt(0, 0, 0)
     this.scene.add(this.shadow_CAM)
@@ -210,6 +211,19 @@ export class Sketch {
   async addObjects() {
     let that = this
 
+    this.mat_plane = new ShadowShaderMateiral(
+      this.shadow_CAM.projectionMatrix, 
+      this.shadow_CAM.matrixWorldInverse,
+      this.shadow_CAM.near,
+      this.shadow_CAM.far,
+    )
+    this.geo_plane = new PlaneGeometry(1, 1, 10, 10)
+    this.msh_plane = new Mesh(this.geo_plane, this.mat_plane)
+    this.msh_plane.rotation.set( 90 * Math.PI/180, 0, 0 )
+    this.msh_plane.position.set( 0, -5, 0 )
+    this.msh_plane.scale.set( 25, 25, 25 )
+    this.scene.add(this.msh_plane)
+
     // GLB loading
     const gltf = await gltfLoader.loadAsync(MSH_Monkey_url)
     const geometry = (gltf.scene.children[0] as Mesh).geometry
@@ -241,6 +255,11 @@ export class Sketch {
   render() {
 
     this.shadow_CAM.position.set(this._debug.settings.lightX, this._debug.settings.lightY, this._debug.settings.lightZ)
+    this.shadow_CAM.near = this._debug.settings.cam_near
+    this.shadow_CAM.far = this._debug.settings.cam_far
+    this.shadow_CAM.updateProjectionMatrix()
+    this.shadow_CAM.updateMatrixWorld()
+    // this.shadow_CAM.near.set(this._debug.settings.cam_near)
 
 
     if (!this.isPlaying) return
@@ -275,6 +294,8 @@ export class Sketch {
     this.renderer.clear(false, true, false)
     this.renderer.render(this._particles_PT, this.shadow_CAM)
 
+    
+    
     // Set up render targets 
     this._quad_simulation!.material.uniforms.u_positions_data_texture.value = this._renderTargets[0].texture[0]
     this._quad_simulation!.material.uniforms.u_velocity_data_texture.value = this._renderTargets[0].texture[1]
@@ -282,12 +303,13 @@ export class Sketch {
     this._quad_simulation!.material.uniforms.u_speed_data_texture.value = this._renderTargets[0].texture[3]
     this.renderer.setRenderTarget(this._renderTargets[1])
     this.renderer.render(this._quad_simulation!, this.camera)
-
+    
     this._particles_PT.material.uniforms.u_positions_data_texture.value = this._renderTargets[1].texture[0]
     this._particles_PT.material.uniforms.u_velocity_data_texture.value = this._renderTargets[1].texture[1]
     this._particles_PT.material.uniforms.u_extra_data_texture.value = this._renderTargets[1].texture[2]
     this._particles_PT.material.uniforms.u_speed_data_texture.value = this._renderTargets[1].texture[3]
     this._particles_PT.material.uniforms.u_depth_map.value = this._depth_RT.depthTexture
+    this.mat_plane.uniforms.u_depth_map.value = this._depth_RT.depthTexture
     this.renderer.setRenderTarget(null)
     this.renderer.render(this.scene, this.camera)
 
